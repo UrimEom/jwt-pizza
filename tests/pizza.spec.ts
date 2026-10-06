@@ -7,5 +7,20 @@ test('home page', async ({ page }) => {
 });
 
 test('purchase with login', async ({ page }) => {
-
+   await page.goto('/');
+   await page.getByRole('button', { name: 'Order now' }).click();
+   await expect(page.locator('h2')).toContainText('Awesome is a click away');
+   await page.getByRole('combobox').selectOption('1');
+   await page.getByRole('link', { name: 'Image Description Veggie A' }).first().click();
+   await page.getByRole('link', { name: 'Image Description Pepperoni' }).first().click();
+   await expect(page.locator('form')).toContainText('Selected pizzas: 2');
+   await page.getByRole('button', { name: 'Checkout' }).click();
+   await page.getByLabel('Email address', { exact: true }).fill('eomurim1@byu.edu');
+   await page.getByLabel('Password', { exact: true }).fill('eomurim');
+   await page.getByRole('button', { name: 'Login', exact: true }).click();
+   await expect(page.getByRole('main')).toContainText('Send me those 2 pizzas right now!');
+   await page.getByRole('cell', { name: 'Veggie' }).click();
+   await expect(page.locator('tbody')).toContainText('Veggie');
+   await page.getByRole('button', { name: 'Pay now' }).click();
+   await expect(page.getByRole('main')).toContainText('0.008 ₿');
 });

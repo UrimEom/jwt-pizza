@@ -6,9 +6,11 @@
   "license": "ISC",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+   "dev": "vite",
+   "build": "vite build",
+   "preview": "vite preview",
+   "test": "playwright test",
+   "test:coverage": "nyc --reporter=json-summary --reporter=text playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { test, expect } from 'playwright-test-coverage';
+import { test, expect } from './testSetup';
 
 async function basicInit(page: Page) {
   const diner = {

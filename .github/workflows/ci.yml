@@ -5,12 +5,15 @@ on:
     branches:
       - main
   workflow_dispatch:
+
 jobs:
   build:
-    name: Build
+    name: Test and Build
     runs-on: ubuntu-latest
+
     outputs:
       version: ${{ steps.set_version.outputs.version }}
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -19,32 +22,71 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22.x'
+          cache: npm
 
-      - name: set version
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set version
         id: set_version
         run: |
           version=$(date +'%Y%m%d.%H%M%S')
           echo "version=$version" >> "$GITHUB_OUTPUT"
           printf '{"version": "%s" }' "$version" > public/version.json
 
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run UI tests with coverage
+        env:
+          VITE_PIZZA_SERVICE_URL: http://localhost:3000
+          VITE_PIZZA_FACTORY_URL: https://pizza-factory.cs329.click
+        run: npm run test:coverage
+
+      - name: Update coverage badge
+        env:
+          NET_ID: ${{ secrets.NET_ID }}
+          FACTORY_API_KEY: ${{ secrets.FACTORY_API_KEY }}
+        run: |
+          coverage=$(jq '.total.lines.pct' coverage/coverage-summary.json)
+          color=$(awk -v coverage="$coverage" 'BEGIN { print coverage < 80 ? "red" : "green" }')
+          curl --fail-with-body -sS -X POST \
+            "https://pizza-factory.cs329.click/api/badge/${NET_ID}/jwtpizzacoverage?label=Coverage&value=${coverage}%25&color=${color}" \
+            -H "authorization: bearer ${FACTORY_API_KEY}"
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-reports
+          path: |
+            playwright-report/
+            coverage/
+          retention-days: 7
+
       - name: Build
         run: |
-          npm ci && npm run build
+          npm run build
           cp dist/index.html dist/404.html
 
       - name: Update pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist/
+
   deploy:
     needs: build
+
     permissions:
       pages: write
       id-token: write
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     runs-on: ubuntu-latest
+
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

@@ -5,8 +5,9 @@ import { pizzaService } from '../service/service';
 import { Order, OrderHistory, Role, User } from '../service/pizzaService';
 
 interface Props {
-  user: User | null;
-}
+   user: User | null;
+   setUser: (user: User) => void;
+ }
 
 export default function DinerDashboard(props: Props) {
   const user = props.user || ({} as User);

@@ -104,6 +104,16 @@ async function setup(
     const path = url.pathname;
     const method = request.method();
 
+    if (path === '/api/user' && method === 'GET') {
+       await route.fulfill({
+          json: {
+          users: [],
+          more: false,
+          },
+       });
+       return;
+    }
+
     if (path === '/api/auth') {
       if (method === 'DELETE') {
         user = null;
@@ -558,45 +568,54 @@ for (const type of ['service', 'factory']) {
 }
 
 test('extended: admin pagination and filtering', async ({ page }) => {
-  const mock = await setup(page);
-  await login(page, 'admin');
-
-  await page.getByRole('link', {
-    name: 'Admin',
-    exact: true,
-  }).click();
-
-  await expect(page.getByRole('main'))
-    .toContainText("Mama Ricci's kitchen");
-
-  await expect(page.locator('tbody')).toHaveCount(3);
-
-  await page.getByRole('button', {
-    name: '»',
-    exact: true,
-  }).click();
-
-  await expect(page.locator('tbody')).toHaveCount(1);
-  await expect(page.locator('tbody')).toContainText('MountainPizza');
-
-  await page.getByRole('button', {
-    name: '«',
-    exact: true,
-  }).click();
-
-  await expect(page.locator('tbody')).toHaveCount(3);
-
-  await page.getByPlaceholder('Filter franchises').fill('Lota');
-
-  await page.getByRole('button', {
-    name: 'Submit',
-    exact: true,
-  }).click();
-
-  await expect(page.locator('tbody')).toHaveCount(1);
-  await expect(page.locator('tbody')).toContainText('LotaPizza');
-
-  mock.assertMocks();
+   const mock = await setup(page);
+   await login(page, 'admin');
+ 
+   await page.getByRole('link', {
+     name: 'Admin',
+     exact: true,
+   }).click();
+ 
+   await expect(page.getByRole('main'))
+     .toContainText("Mama Ricci's kitchen");
+ 
+   const franchiseTable = page.getByRole('table', {
+     name: 'Franchises',
+     exact: true,
+   });
+ 
+   const franchiseBodies = franchiseTable.locator('tbody');
+ 
+   await expect(franchiseBodies).toHaveCount(3);
+ 
+   await franchiseTable.getByRole('button', {
+     name: '»',
+     exact: true,
+   }).click();
+ 
+   await expect(franchiseBodies).toHaveCount(1);
+   await expect(franchiseBodies).toContainText('MountainPizza');
+ 
+   await franchiseTable.getByRole('button', {
+     name: '«',
+     exact: true,
+   }).click();
+ 
+   await expect(franchiseBodies).toHaveCount(3);
+ 
+   await franchiseTable
+     .getByPlaceholder('Filter franchises')
+     .fill('Lota');
+ 
+   await franchiseTable.getByRole('button', {
+     name: 'Submit',
+     exact: true,
+   }).click();
+ 
+   await expect(franchiseBodies).toHaveCount(1);
+   await expect(franchiseBodies).toContainText('LotaPizza');
+ 
+   mock.assertMocks();
 });
 
 test('extended: create and close franchise', async ({ page }) => {

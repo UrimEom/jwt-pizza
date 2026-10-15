@@ -4,7 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import NotFound from './notFound';
 import Button from '../components/button';
 import { pizzaService } from '../service/service';
-import { Franchise, FranchiseList, Role, Store, User } from '../service/pizzaService';
+import {
+   Franchise,
+   FranchiseList,
+   Role,
+   Store,
+   User,
+   UserList,
+} from '../service/pizzaService';
 import { TrashIcon } from '../icons';
 
 interface Props {
@@ -16,6 +23,41 @@ export default function AdminDashboard(props: Props) {
   const [franchiseList, setFranchiseList] = React.useState<FranchiseList>({ franchises: [], more: false });
   const [franchisePage, setFranchisePage] = React.useState(0);
   const filterFranchiseRef = React.useRef<HTMLInputElement>(null);
+  const [userList, setUserList] = React.useState<UserList>({
+    users: [],
+    more: false,
+  });
+ 
+  const [userError, setUserError] = React.useState('');
+ 
+  React.useEffect(() => {
+    if (!Role.isRole(props.user, Role.Admin)) {
+      return;
+    }
+ 
+    let active = true;
+ 
+    async function loadUsers() {
+      try {
+        const result = await pizzaService.getUsers(1, 10, '*');
+ 
+        if (active) {
+          setUserList(result);
+          setUserError('');
+        }
+      } catch {
+        if (active) {
+          setUserError('Unable to load users.');
+        }
+      }
+    }
+ 
+    void loadUsers();
+ 
+    return () => {
+      active = false;
+    };
+  }, [props.user]);
 
   React.useEffect(() => {
     (async () => {
@@ -50,7 +92,10 @@ export default function AdminDashboard(props: Props) {
               <div className="-m-1.5 overflow-x-auto">
                 <div className="p-1.5 min-w-full inline-block align-middle">
                   <div className="overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
+                      <table
+                        aria-label="Franchises"
+                        className="min-w-full divide-y divide-gray-200"
+                        >
                       <thead className="uppercase text-neutral-100 bg-slate-400 border-b-2 border-gray-500">
                         <tr>
                           {['Franchise', 'Franchisee', 'Store', 'Revenue', 'Action'].map((header) => (
@@ -123,6 +168,61 @@ export default function AdminDashboard(props: Props) {
         <div>
           <Button className="w-36 text-xs sm:text-sm sm:w-64" title="Add Franchise" onPress={createFranchise} />
         </div>
+
+        <section className="text-start py-8 px-4 sm:px-6 lg:px-8">
+            <h3 className="text-neutral-100 text-xl">Users</h3>
+
+            {userError && (
+               <p role="alert" className="my-2 text-red-400">
+                  {userError}
+               </p>
+            )}
+
+            <div className="bg-neutral-100 overflow-x-auto my-4">
+               <table
+                  aria-label="Users"
+                  className="min-w-full divide-y divide-gray-200"
+               >
+                  <thead className="uppercase text-neutral-100 bg-slate-400">
+                  <tr>
+                     {['Name', 'Email', 'Roles'].map((heading) => (
+                        <th
+                        key={heading}
+                        scope="col"
+                        className="px-6 py-3 text-start text-sm font-medium"
+                        >
+                        {heading}
+                        </th>
+                     ))}
+                  </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-200">
+                  {userList.users.map((listedUser) => (
+                     <tr key={listedUser.id} className="text-gray-800">
+                        <td className="px-6 py-4 text-sm">
+                        {listedUser.name}
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                        {listedUser.email}
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                        {listedUser.roles?.map((role) => role.role).join(', ')}
+                        </td>
+                     </tr>
+                  ))}
+
+                  {!userError && userList.users.length === 0 && (
+                     <tr>
+                        <td colSpan={3} className="px-6 py-4 text-gray-800">
+                        No users found.
+                        </td>
+                     </tr>
+                  )}
+                  </tbody>
+               </table>
+            </div>
+         </section>
       </View>
     );
   }

@@ -102,3 +102,161 @@ test('an admin can see user names, emails, and roles', async ({ page }) => {
     ).toBeVisible();
   }
 });
+
+test('an admin can paginate and filter users', async ({ page }) => {
+   const admin = {
+     id: 1,
+     name: 'Ada Admin',
+     email: 'admin@test.com',
+     roles: [{ role: 'admin' }],
+   };
+ 
+   // Eleven matching users produce two pages with a page size of ten.
+   const users = Array.from({ length: 11 }, (_, index) => ({
+     id: index + 2,
+     name: `Pizza Diner ${index + 1}`,
+     email: `diner${index + 1}@test.com`,
+     roles: [{ role: 'diner' }],
+   }));
+ 
+   await page.addInitScript(() => {
+     localStorage.setItem('token', 'admin-test-token');
+   });
+ 
+   await page.route('**/api/user/me', async (route) => {
+     await route.fulfill({ json: admin });
+   });
+ 
+   await page.route(/\/api\/franchise(\?.*)?$/, async (route) => {
+     await route.fulfill({
+       json: {
+         franchises: [],
+         more: false,
+       },
+     });
+   });
+ 
+   await page.route(/\/api\/user(\?.*)?$/, async (route) => {
+     const url = new URL(route.request().url());
+     const currentPage = Number(url.searchParams.get('page') ?? 1);
+     const limit = Number(url.searchParams.get('limit') ?? 10);
+     const name = url.searchParams.get('name') ?? '*';
+ 
+     expect(route.request().method()).toBe('GET');
+     expect(currentPage).toBeGreaterThanOrEqual(1);
+     expect(limit).toBe(10);
+ 
+     const search = name.replace(/\*/g, '').toLowerCase();
+     const matchingUsers = users.filter((user) =>
+       user.name.toLowerCase().includes(search)
+     );
+ 
+     const offset = (currentPage - 1) * limit;
+ 
+     await route.fulfill({
+       json: {
+         users: matchingUsers.slice(offset, offset + limit),
+         more: offset + limit < matchingUsers.length,
+       },
+     });
+   });
+ 
+   await page.goto('/admin-dashboard');
+ 
+   const table = page.getByRole('table', {
+     name: 'Users',
+     exact: true,
+   });
+ 
+   const rows = table.locator('tbody tr');
+ 
+   const previous = page.getByRole('button', {
+     name: 'Previous users',
+     exact: true,
+   });
+ 
+   const next = page.getByRole('button', {
+     name: 'Next users',
+     exact: true,
+   });
+ 
+   const filter = page.getByRole('textbox', {
+     name: 'Filter users',
+     exact: true,
+   });
+ 
+   const applyFilter = page.getByRole('button', {
+     name: 'Filter users',
+     exact: true,
+   });
+ 
+   // First page.
+   await expect(rows).toHaveCount(10);
+   await expect(previous).toBeDisabled();
+   await expect(next).toBeEnabled();
+ 
+   // Second page.
+   await next.click();
+ 
+   await expect(rows).toHaveCount(1);
+   await expect(table).toContainText('diner11@test.com');
+   await expect(previous).toBeEnabled();
+   await expect(next).toBeDisabled();
+ 
+   // Return to the first page.
+   await previous.click();
+ 
+   await expect(rows).toHaveCount(10);
+   await expect(previous).toBeDisabled();
+ 
+   // Changing the filter while on page two must reset to page one.
+   await next.click();
+   await expect(table).toContainText('diner11@test.com');
+ 
+   await filter.fill('Pizza Diner 2');
+   await applyFilter.click();
+ 
+   await expect(rows).toHaveCount(1);
+   await expect(table).toContainText('diner2@test.com');
+   await expect(previous).toBeDisabled();
+   await expect(next).toBeDisabled();
+ 
+   // A filter must stay active when navigating pages.
+   await filter.fill('Pizza');
+   await applyFilter.click();
+ 
+   await expect(rows).toHaveCount(10);
+ 
+   const filteredPageRequest = page.waitForRequest((request) => {
+     const url = new URL(request.url());
+ 
+     return (
+       request.method() === 'GET' &&
+       url.pathname === '/api/user' &&
+       url.searchParams.get('page') === '2' &&
+       url.searchParams.get('name') === '*Pizza*'
+     );
+   });
+ 
+   await next.click();
+   await filteredPageRequest;
+ 
+   await expect(rows).toHaveCount(1);
+   await expect(table).toContainText('diner11@test.com');
+ 
+   // A filter with no matches displays the empty-state message.
+   await filter.fill('NobodyMatches');
+   await applyFilter.click();
+ 
+   await expect(table).toContainText('No users found.');
+   await expect(previous).toBeDisabled();
+   await expect(next).toBeDisabled();
+ 
+   // Clearing the filter restores the first page.
+   await filter.fill('');
+   await applyFilter.click();
+ 
+   await expect(rows).toHaveCount(10);
+   await expect(previous).toBeDisabled();
+   await expect(next).toBeEnabled();
+});

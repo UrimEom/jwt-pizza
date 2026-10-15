@@ -91,6 +91,14 @@ class HttpPizzaService implements PizzaService {
     );
   }
 
+  async deleteUser(user: User): Promise<void> {
+    if (!user.id) {
+      throw new Error('A user ID is required.');
+    }
+
+    await this.callEndpoint(`/api/user/${user.id}`, 'DELETE');
+  }
+
   async getMenu(): Promise<Menu> {
     return this.callEndpoint('/api/order/menu');
   }

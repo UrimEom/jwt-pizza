@@ -260,3 +260,105 @@ test('an admin can paginate and filter users', async ({ page }) => {
    await expect(previous).toBeDisabled();
    await expect(next).toBeEnabled();
 });
+
+test('an admin can delete a user', async ({ page }) => {
+   const admin = {
+     id: 1,
+     name: 'Ada Admin',
+     email: 'admin@test.com',
+     roles: [{ role: 'admin' }],
+   };
+ 
+   const diner = {
+     id: 3,
+     name: 'Disposable Diner',
+     email: 'delete@test.com',
+     roles: [{ role: 'diner' }],
+   };
+ 
+   let users = [admin, diner];
+   let deleteReceived = false;
+ 
+   await page.addInitScript(() => {
+     localStorage.setItem('token', 'test-token');
+   });
+ 
+   await page.route('**/api/user/me', async (route) => {
+     await route.fulfill({ json: admin });
+   });
+ 
+   await page.route(/\/api\/franchise(?:\?.*)?$/, async (route) => {
+     await route.fulfill({
+       json: {
+         franchises: [],
+         more: false,
+       },
+     });
+   });
+ 
+   await page.route(/\/api\/user(?:\?.*)?$/, async (route) => {
+     await route.fulfill({
+       json: {
+         users,
+         more: false,
+       },
+     });
+   });
+ 
+   await page.route('**/api/user/3', async (route) => {
+     expect(route.request().method()).toBe('DELETE');
+     expect(route.request().headers().authorization)
+       .toBe('Bearer test-token');
+ 
+     deleteReceived = true;
+     users = users.filter((user) => user.id !== diner.id);
+ 
+     await route.fulfill({
+       json: { message: 'user deleted' },
+     });
+   });
+ 
+   await page.goto('/admin-dashboard');
+ 
+   const usersTable = page.getByRole('table', {
+     name: 'Users',
+     exact: true,
+   });
+ 
+   const dinerRow = usersTable.getByRole('row').filter({
+     has: page.getByRole('cell', {
+       name: diner.email,
+       exact: true,
+     }),
+   });
+ 
+   await expect(dinerRow).toBeVisible();
+ 
+   await dinerRow.getByRole('button', {
+     name: 'Delete',
+     exact: true,
+   }).click();
+ 
+   await expect(dinerRow).toHaveCount(0);
+   expect(deleteReceived).toBe(true);
+ 
+   // Deleting the diner must preserve the admin.
+   await expect(
+     usersTable.getByRole('cell', {
+       name: admin.email,
+       exact: true,
+     })
+   ).toBeVisible();
+ 
+   // The updated list should still exclude the deleted diner after reload.
+   await page.reload();
+ 
+   await expect(
+     usersTable.getByRole('cell', {
+       name: admin.email,
+       exact: true,
+     })
+   ).toBeVisible();
+ 
+   await expect(dinerRow).toHaveCount(0);
+});

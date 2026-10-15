@@ -34,7 +34,9 @@ export default function AdminDashboard(props: Props) {
   const [userFilter, setUserFilter] = React.useState('*');
   const [userFilterInput, setUserFilterInput] = React.useState('');
   const [usersLoading, setUsersLoading] = React.useState(true);
- 
+  const [deletingUser, setDeletingUser] = React.useState(false);
+  const [userRefresh, setUserRefresh] = React.useState(0);
+
    React.useEffect(() => {
     if (!Role.isRole(props.user, Role.Admin)) {
       return;
@@ -72,7 +74,7 @@ export default function AdminDashboard(props: Props) {
     return () => {
       active = false;
     };
-  }, [props.user, userPage, userFilter]);
+  }, [props.user, userPage, userFilter, userRefresh]);
 
   React.useEffect(() => {
     (async () => {
@@ -101,6 +103,26 @@ export default function AdminDashboard(props: Props) {
  
     setUserPage(1);
     setUserFilter(`*${userFilterInput.trim()}*`);
+  }
+
+  async function deleteUser(listedUser: User) {
+   setDeletingUser(true);
+   setUserError('');
+
+   try {
+      await pizzaService.deleteUser(listedUser);
+
+     // Move back if deleting the only user on a later page.
+      if (userList.users.length === 1 && userPage > 1) {
+        setUserPage((page) => page - 1);
+      } else {
+        setUserRefresh((value) => value + 1);
+      }
+    } catch {
+      setUserError('Unable to delete the user. Please try again.');
+    } finally {
+      setDeletingUser(false);
+    }
   }
 
   let response = <NotFound />;
@@ -238,7 +260,7 @@ export default function AdminDashboard(props: Props) {
             >
                <thead className="uppercase text-neutral-100 bg-slate-400">
                <tr>
-                  {['Name', 'Email', 'Roles'].map((heading) => (
+                  {['Name', 'Email', 'Roles', 'Action'].map((heading) => (
                      <th
                      key={heading}
                      scope="col"
@@ -264,12 +286,22 @@ export default function AdminDashboard(props: Props) {
                      <td className="px-6 py-4 text-sm">
                      {listedUser.roles?.map((role) => role.role).join(', ')}
                      </td>
+
+                     <td className="px-6 py-4 text-sm">
+                     <button
+                        type="button"
+                        disabled={usersLoading || deletingUser}
+                        onClick={() => void deleteUser(listedUser)}
+                        className="px-3 py-2 rounded-lg border border-red-600 text-red-600 disabled:opacity-50"
+                     >
+                        Delete
+                     </button>
+                     </td>
                   </tr>
                ))}
-
                {!usersLoading && !userError && userList.users.length === 0 && (
                   <tr>
-                     <td colSpan={3} className="px-6 py-4 text-gray-800">
+                     <td colSpan={4} className="px-6 py-4 text-gray-800">
                      No users found.
                      </td>
                   </tr>
@@ -281,7 +313,7 @@ export default function AdminDashboard(props: Props) {
          <div className="flex items-center justify-end gap-3 text-neutral-100">
             <button
                type="button"
-               disabled={usersLoading || userPage <= 1}
+               disabled={usersLoading || deletingUser || userPage <= 1}
                onClick={() => setUserPage((page) => page - 1)}
                className="px-3 py-2 rounded-lg border border-orange-400 text-orange-400 disabled:opacity-50"
             >
@@ -292,7 +324,7 @@ export default function AdminDashboard(props: Props) {
 
             <button
                type="button"
-               disabled={usersLoading || !userList.more}
+               disabled={usersLoading || deletingUser || !userList.more}
                onClick={() => setUserPage((page) => page + 1)}
                className="px-3 py-2 rounded-lg border border-orange-400 text-orange-400 disabled:opacity-50"
             >

@@ -1,3 +1,6 @@
+import { CloseIcon } from '../icons';
+import { HSOverlay } from 'preline';
+import Button from '../components/button';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import View from './view';
@@ -12,6 +15,40 @@ interface Props {
 export default function DinerDashboard(props: Props) {
   const user = props.user || ({} as User);
   const [orders, setOrders] = React.useState<Order[]>([]);
+
+  const nameRef = React.useRef<HTMLInputElement>(null);
+  const emailRef = React.useRef<HTMLInputElement>(null);
+  const passwordRef = React.useRef<HTMLInputElement>(null);
+  const [updateError, setUpdateError] = React.useState('');
+  
+  async function updateUser() {
+    setUpdateError('');
+  
+    try {
+      const updatedUser: User = {
+        id: user.id,
+        name: nameRef.current?.value ?? user.name,
+        email: emailRef.current?.value ?? user.email,
+        password: passwordRef.current?.value || undefined,
+        roles: user.roles,
+      };
+  
+      const savedUser = await pizzaService.updateUser(updatedUser);
+      props.setUser(savedUser);
+  
+      setTimeout(() => {
+        HSOverlay.close(document.getElementById('hs-jwt-modal')!);
+      }, 100);
+    } catch (error) {
+      console.error('Update user failed:', error);
+    
+      setUpdateError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to update your account. Please try again.'
+      );
+    }
+  }
 
   React.useEffect(() => {
     (async () => {
@@ -36,6 +73,19 @@ export default function DinerDashboard(props: Props) {
         <div className="hs-tooltip inline-block">
           <img className="hs-tooltip-toggle relative inline-block size-[96px] rounded-full ring-2 ring-white hover:z-10" src="https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80" alt="Employee stock photo" />
         </div>
+        <Button
+          title="Edit"
+          className="w-16 p-0"
+          onPress={() => {
+            setUpdateError('');
+
+            if (nameRef.current) nameRef.current.value = user.name ?? '';
+            if (emailRef.current) emailRef.current.value = user.email ?? '';
+            if (passwordRef.current) passwordRef.current.value = '';
+
+            HSOverlay.open(document.getElementById('hs-jwt-modal')!);
+         }}
+        />
 
         <div className="my-4 text-lg text-orange-200 text-start grid grid-cols-5 gap-2">
           <div className="font-semibold text-orange-400">name:</div> <div className="col-span-4">{user.name}</div>
@@ -99,6 +149,85 @@ export default function DinerDashboard(props: Props) {
             </div>
           </>
         )}
+      </div>
+
+      <div
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="dialog-title"
+         id="hs-jwt-modal"
+         className="hs-overlay hidden size-full fixed top-10 start-0 z-[80] overflow-x-hidden overflow-y-auto pointer-events-none"
+         >
+         <div className="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-lg sm:w-full m-3 sm:mx-auto min-h-[calc(100%-3.5rem)]">
+            <div className="w-full flex flex-col bg-white border shadow-sm rounded-xl pointer-events-auto text-gray-800">
+               <div className="flex justify-between items-center py-3 px-4 border-b bg-slate-200 rounded-t-xl">
+               <h3 id="dialog-title" className="font-bold">
+                  Edit user
+               </h3>
+
+               <button
+                  type="button"
+                  aria-label="Close"
+                  className="flex justify-center items-center size-7 rounded-full hover:bg-gray-100"
+                  data-hs-overlay="#hs-jwt-modal"
+               >
+                  <CloseIcon className="" />
+               </button>
+               </div>
+
+               <div className="p-4">
+               <div className="my-4 text-start grid grid-cols-5 gap-2 items-center">
+                  <label htmlFor="edit-name" className="font-semibold">
+                     Name
+                  </label>
+                  <input
+                     id="edit-name"
+                     type="text"
+                     className="col-span-4 border border-gray-300 rounded-md p-1"
+                     defaultValue={user.name}
+                     ref={nameRef}
+                  />
+
+                  <label htmlFor="edit-email" className="font-semibold">
+                     Email
+                  </label>
+                  <input
+                     id="edit-email"
+                     type="email"
+                     className="col-span-4 border border-gray-300 rounded-md p-1"
+                     defaultValue={user.email}
+                     ref={emailRef}
+                  />
+
+                  <label htmlFor="edit-password" className="font-semibold">
+                     Password
+                  </label>
+                  <input
+                     id="edit-password"
+                     type="password"
+                     className="col-span-4 border border-gray-300 rounded-md p-1"
+                     ref={passwordRef}
+                  />
+               </div>
+
+               {updateError && (
+                  <p role="alert" className="text-red-600">
+                     {updateError}
+                  </p>
+               )}
+               </div>
+
+               <div className="flex justify-end items-center gap-x-2 py-3 px-4 border-t bg-slate-200 rounded-b-xl">
+               <button
+                  type="button"
+                  className="py-2 px-3 text-sm font-medium rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
+                  onClick={updateUser}
+               >
+                  Update
+               </button>
+               </div>
+            </div>
+         </div>
       </div>
     </View>
   );

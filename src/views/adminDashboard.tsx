@@ -29,35 +29,50 @@ export default function AdminDashboard(props: Props) {
   });
  
   const [userError, setUserError] = React.useState('');
+
+  const [userPage, setUserPage] = React.useState(1);
+  const [userFilter, setUserFilter] = React.useState('*');
+  const [userFilterInput, setUserFilterInput] = React.useState('');
+  const [usersLoading, setUsersLoading] = React.useState(true);
  
-  React.useEffect(() => {
+   React.useEffect(() => {
     if (!Role.isRole(props.user, Role.Admin)) {
       return;
     }
- 
+
     let active = true;
- 
+
     async function loadUsers() {
+      setUsersLoading(true);
+      setUserError('');
+
       try {
-        const result = await pizzaService.getUsers(1, 10, '*');
+        const result = await pizzaService.getUsers(
+          userPage,
+          10,
+          userFilter
+        );
  
         if (active) {
           setUserList(result);
-          setUserError('');
         }
       } catch {
         if (active) {
           setUserError('Unable to load users.');
         }
+      } finally {
+        if (active) {
+          setUsersLoading(false);
+        }
       }
     }
- 
+
     void loadUsers();
- 
+
     return () => {
       active = false;
     };
-  }, [props.user]);
+  }, [props.user, userPage, userFilter]);
 
   React.useEffect(() => {
     (async () => {
@@ -79,6 +94,13 @@ export default function AdminDashboard(props: Props) {
 
   async function filterFranchises() {
     setFranchiseList(await pizzaService.getFranchises(franchisePage, 10, `*${filterFranchiseRef.current?.value}*`));
+  }
+
+   function filterUsers(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+ 
+    setUserPage(1);
+    setUserFilter(`*${userFilterInput.trim()}*`);
   }
 
   let response = <NotFound />;
@@ -168,61 +190,116 @@ export default function AdminDashboard(props: Props) {
         <div>
           <Button className="w-36 text-xs sm:text-sm sm:w-64" title="Add Franchise" onPress={createFranchise} />
         </div>
-
         <section className="text-start py-8 px-4 sm:px-6 lg:px-8">
-            <h3 className="text-neutral-100 text-xl">Users</h3>
+         <h3 className="text-neutral-100 text-xl">Users</h3>
 
-            {userError && (
-               <p role="alert" className="my-2 text-red-400">
-                  {userError}
-               </p>
-            )}
+         <form
+            onSubmit={filterUsers}
+            className="flex flex-wrap items-center gap-2 my-4"
+         >
+            <label htmlFor="filter-users" className="text-neutral-100">
+               Filter users
+            </label>
 
-            <div className="bg-neutral-100 overflow-x-auto my-4">
-               <table
-                  aria-label="Users"
-                  className="min-w-full divide-y divide-gray-200"
-               >
-                  <thead className="uppercase text-neutral-100 bg-slate-400">
-                  <tr>
-                     {['Name', 'Email', 'Roles'].map((heading) => (
-                        <th
-                        key={heading}
-                        scope="col"
-                        className="px-6 py-3 text-start text-sm font-medium"
-                        >
-                        {heading}
-                        </th>
-                     ))}
-                  </tr>
-                  </thead>
+            <input
+               id="filter-users"
+               type="text"
+               value={userFilterInput}
+               onChange={(event) => setUserFilterInput(event.target.value)}
+               placeholder="Enter a user name"
+               className="px-3 py-2 border border-gray-300 rounded-lg text-gray-800"
+            />
 
-                  <tbody className="divide-y divide-gray-200">
-                  {userList.users.map((listedUser) => (
-                     <tr key={listedUser.id} className="text-gray-800">
-                        <td className="px-6 py-4 text-sm">
-                        {listedUser.name}
-                        </td>
-                        <td className="px-6 py-4 text-sm">
-                        {listedUser.email}
-                        </td>
-                        <td className="px-6 py-4 text-sm">
-                        {listedUser.roles?.map((role) => role.role).join(', ')}
-                        </td>
-                     </tr>
+            <button
+               type="submit"
+               disabled={usersLoading}
+               className="px-3 py-2 rounded-lg border border-orange-400 text-orange-400 disabled:opacity-50"
+            >
+               Filter users
+            </button>
+         </form>
+
+         {userError && (
+            <p role="alert" className="my-2 text-red-400">
+               {userError}
+            </p>
+         )}
+
+         {usersLoading && (
+            <p role="status" className="my-2 text-neutral-100">
+               Loading users...
+            </p>
+         )}
+
+         <div className="bg-neutral-100 overflow-x-auto my-4">
+            <table
+               aria-label="Users"
+               className="min-w-full divide-y divide-gray-200"
+            >
+               <thead className="uppercase text-neutral-100 bg-slate-400">
+               <tr>
+                  {['Name', 'Email', 'Roles'].map((heading) => (
+                     <th
+                     key={heading}
+                     scope="col"
+                     className="px-6 py-3 text-start text-sm font-medium"
+                     >
+                     {heading}
+                     </th>
                   ))}
+               </tr>
+               </thead>
 
-                  {!userError && userList.users.length === 0 && (
-                     <tr>
-                        <td colSpan={3} className="px-6 py-4 text-gray-800">
-                        No users found.
-                        </td>
-                     </tr>
-                  )}
-                  </tbody>
-               </table>
-            </div>
-         </section>
+               <tbody className="divide-y divide-gray-200">
+               {userList.users.map((listedUser) => (
+                  <tr key={listedUser.id} className="text-gray-800">
+                     <td className="px-6 py-4 text-sm">
+                     {listedUser.name}
+                     </td>
+
+                     <td className="px-6 py-4 text-sm">
+                     {listedUser.email}
+                     </td>
+
+                     <td className="px-6 py-4 text-sm">
+                     {listedUser.roles?.map((role) => role.role).join(', ')}
+                     </td>
+                  </tr>
+               ))}
+
+               {!usersLoading && !userError && userList.users.length === 0 && (
+                  <tr>
+                     <td colSpan={3} className="px-6 py-4 text-gray-800">
+                     No users found.
+                     </td>
+                  </tr>
+               )}
+               </tbody>
+            </table>
+         </div>
+
+         <div className="flex items-center justify-end gap-3 text-neutral-100">
+            <button
+               type="button"
+               disabled={usersLoading || userPage <= 1}
+               onClick={() => setUserPage((page) => page - 1)}
+               className="px-3 py-2 rounded-lg border border-orange-400 text-orange-400 disabled:opacity-50"
+            >
+               Previous users
+            </button>
+
+            <span>Page {userPage}</span>
+
+            <button
+               type="button"
+               disabled={usersLoading || !userList.more}
+               onClick={() => setUserPage((page) => page + 1)}
+               className="px-3 py-2 rounded-lg border border-orange-400 text-orange-400 disabled:opacity-50"
+            >
+               Next users
+            </button>
+         </div>
+        </section>
       </View>
     );
   }

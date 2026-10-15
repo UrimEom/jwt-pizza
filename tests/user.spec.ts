@@ -1,12 +1,17 @@
 import { test, expect } from './testSetup';
 
-test('a diner can update their name', async ({ page }) => {
-  let user = {
-    id: 3,
-    name: 'Pizza Diner',
-    email: 'diner@test.com',
-    roles: [{ role: 'diner' }],
-  };
+for (const role of ['diner', 'admin', 'franchisee']) {
+  test(`a ${role} can update their name`, async ({ page }) => {
+     let user = {
+       id: 3,
+       name: 'Pizza Diner',
+       email: 'diner@test.com',
+       roles: [
+         role === 'franchisee'
+           ? { role, objectId: 2 }
+           : { role },
+       ],
+     };
 
   // Start with a simulated authenticated session.
   await page.addInitScript(() => {
@@ -32,6 +37,7 @@ test('a diner can update their name', async ({ page }) => {
     const changes = route.request().postDataJSON();
 
     expect(changes.name).toBe('Updated Diner');
+    expect(changes.roles).toEqual(user.roles);
 
     user = {
       ...user,
@@ -76,7 +82,8 @@ test('a diner can update their name', async ({ page }) => {
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem('token')))
     .toBe('updated-test-token');
-});
+   });
+}
 
 test('a diner can update their email and password', async ({ page }) => {
    let user = {

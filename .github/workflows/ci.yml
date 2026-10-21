@@ -75,6 +75,7 @@ jobs:
           path: dist/
 
   deploy:
+    if: ${{ false }}
     name: Test S3 Deployment
     needs: build
     runs-on: ubuntu-latest

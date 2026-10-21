@@ -73,7 +73,7 @@ jobs:
           name: package
           path: dist/
 
-    deploy:
+  deploy:
     name: Deploy Frontend to AWS
     needs: build
     runs-on: ubuntu-latest

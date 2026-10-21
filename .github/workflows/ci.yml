@@ -75,19 +75,28 @@ jobs:
           path: dist/
 
   deploy:
+    name: Test S3 Deployment
     needs: build
-
-    permissions:
-      pages: write
-      id-token: write
-
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
     runs-on: ubuntu-latest
 
+    permissions:
+      id-token: write
+      contents: read
+
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Create OIDC token to AWS
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          audience: sts.amazonaws.com
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT }}:role/${{ secrets.CI_IAM_ROLE }}
+
+      - name: Push test page to AWS S3
+        env:
+          APP_BUCKET: ${{ secrets.APP_BUCKET }}
+          DISTRIBUTION_ID: ${{ secrets.DISTRIBUTION_ID }}
+        run: |
+          mkdir -p dist
+          printf '<h1>CloudFront deployment with GitHub Actions</h1>' > dist/index.html
+          aws s3 cp dist "s3://${APP_BUCKET}" --recursive
+          aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/*"
